@@ -1,0 +1,11 @@
+# runtime state của máy từng người (đường dẫn local, không nên chia sẻ)
+recent.json
+
+# model weights - tool tự tải về khi chạy lần đầu (xem README), không commit vì quá nặng
+models/
+models.zip
+mobileclip2_b.ts
+
+# python
+__pycache__/
+*.pyc

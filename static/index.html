@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EdgeTool</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header id="top">
+  <b class="logo">EdgeTool</b>
+  <nav>
+    <button data-view="home">Folder</button>
+    <button data-view="grid">Check</button>
+    <button data-view="editor">Label</button>
+  </nav>
+  <span id="folder" class="muted"></span>
+  <span class="grow"></span>
+  <span id="jobbox" hidden><progress id="jobbar" max="1" value="0"></progress> <span id="jobtxt"></span> <button id="jobstop">Dừng</button></span>
+  <button id="btnScan" title="Tính lại ảnh mới/đã đổi">Scan</button>
+</header>
+
+<!-- ============ HOME ============ -->
+<section id="v-home" class="view">
+  <div class="card narrow">
+    <h2>Chọn folder ảnh cần check</h2>
+    <p class="muted">Kết quả lưu ở <code>data-labeled\&lt;tên dataset&gt;\</code> (cạnh thư mục edgetool): <code>images\</code> + <code>labels\</code>
+      (nhãn YOLO-OBB) + <code>data.yaml</code> = 1 dataset đủ bộ, cộng <code>good\ bad\</code> khi bạn đánh giá.
+      Ảnh gốc không bị sửa (images\ là hardlink, không tốn thêm dung lượng).</p>
+    <div class="row"><input id="folderIn" placeholder="D:\...\folder ảnh" class="grow"><button id="btnPick">Duyệt...</button><button id="btnOpen" class="primary">Mở</button></div>
+    <h3>Nguồn nhãn có sẵn (tự nhận theo thứ tự)</h3>
+    <ol class="muted small">
+      <li>Nhãn đã lưu bởi tool: <code>_checked/labels/*.txt</code></li>
+      <li>YOLO / YOLO-OBB / polygon cạnh ảnh, hoặc <code>images → labels</code>, hoặc <code>../labels/*.txt</code></li>
+      <li>Open Images: <code>../labels/detections.csv</code> + <code>../metadata/classes.csv</code>, lọc class:
+        <input id="oiClasses" class="w300"> <button id="btnOiSave">Lưu</button></li>
+    </ol>
+    <p class="muted small">Ảnh không có nhãn sẽ hiện lỗi đỏ để bạn kiểm tra lại.</p>
+  </div>
+
+  <div class="card narrow">
+    <h2>Thư mục đã check</h2>
+    <p class="muted small">Mọi folder từng mở bằng tool này, phân loại nhãn: <span class="badge-auto">AUTO</span> tự động ghi (chưa chắc đã người xem),
+      <span class="badge-manual">THỦ CÔNG</span> bạn tự vẽ/sửa, <span class="badge-import">NHẬP SẴN</span> từ Open Images/YOLO gốc.</p>
+    <table class="ptable" id="projTable">
+      <thead><tr><th>Thư mục ảnh gốc</th><th>Lưu ở data-labeled\</th><th>Ảnh</th><th>Auto</th><th>Thủ công</th><th>Nhập sẵn</th><th>Chưa nhãn</th><th>Done</th><th>good/bad</th><th></th></tr></thead>
+      <tbody id="projBody"><tr><td colspan="10" class="muted">(chưa mở folder nào)</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card narrow" id="homeAutoCard" hidden>
+    <h2>Auto-label trước cả thư mục</h2>
+    <p class="muted">Chạy model lên <b>mọi ảnh</b> cùng lúc và <b>ghi thẳng thành nhãn</b> (không cần bấm "Nhận" từng đề xuất).
+      Xong thì sang tab <b>Check</b>, lọc "tự động - chưa duyệt" để xem lại, sửa chỗ sai rồi gắn good/bad.</p>
+    <div class="row">Thư mục ảnh <input id="hFolderPath" class="grow mono" placeholder="D:\...\folder ảnh"><button id="hFolderBrowse">Duyệt...</button><button id="hFolderOpen">Mở & dùng</button></div>
+    <div id="hFolderWarn" class="banner" hidden>Folder này khác folder đang mở — bấm "Chạy" sẽ tự mở folder này trước rồi mới auto-label nó.</div>
+    <div class="row small" id="hDestRow">Lưu vào <code id="hDest" class="grow"></code><button id="hDestOpen" title="Mở bằng Explorer">📂 Mở</button></div>
+    <div class="row">Model <select id="hModel" class="grow"></select></div>
+    <p id="hNote" class="muted small"></p>
+    <div class="row">Ngưỡng <input type="range" id="hConf" min="0.05" max="0.9" step="0.05" value="0.3"><span id="hConfV">0.30</span></div>
+    <div class="row"><input id="hClassNew" placeholder="Thêm class mới (vd: Hat)" class="w200">
+      <input id="hClassPrompt" placeholder="prompt tiếng Anh, phẩy cách (tuỳ chọn)" class="grow">
+      <button id="hClassAdd">+ Thêm class</button>
+      <button id="hClassPreset" title="Thêm nhanh Hat/Mask/Backpack/Gloves/Goggles">+ Gợi ý PPE</button></div>
+    <div id="hClasses" class="chips"></div>
+    <div class="row">
+      <label><input type="radio" name="hScope" value="all" checked> label lại TOÀN BỘ ảnh trong folder</label>
+      <label><input type="radio" name="hScope" value="missing"> chỉ ảnh CHƯA có nhãn (bỏ qua ảnh đã có nhãn)</label>
+    </div>
+    <div class="row">
+      <label><input type="radio" name="hMode" value="append" checked> thêm vào nhãn hiện có (giữ nhãn cũ, bỏ qua trùng)</label>
+      <label><input type="radio" name="hMode" value="overwrite"> ghi đè toàn bộ (xoá hết nhãn cũ trước khi ghi)</label>
+    </div>
+    <div class="row"><button id="hRun" class="primary">Chạy auto-label cả thư mục</button></div>
+    <p class="muted small">Lần chạy đầu của mỗi model có thể phải tải weights (vài phút, chỉ 1 lần). Class mới thêm ở đây
+      dùng chung với tab <b>Label → Class</b> (ghi vào <code>data.yaml</code>), prompt nên viết tiếng Anh.</p>
+    <div id="hMsg" class="small"></div>
+  </div>
+</section>
+
+<!-- ============ GRID ============ -->
+<section id="v-grid" class="view">
+  <div class="toolbar">
+    Lọc <select id="gFilter">
+      <option value="">tất cả</option><option value="unrated">chưa đánh giá</option>
+      <option value="good">good</option><option value="bad">bad</option>
+      <option value="nolabel">KHÔNG CÓ NHÃN</option><option value="errors">có lỗi</option>
+      <option value="props">có đề xuất auto-label</option><option value="autounreviewed">tự động - chưa duyệt</option>
+      <option value="pending">chưa scan</option></select>
+    Sắp xếp <select id="gSort"><option value="score_asc">điểm thấp → cao</option><option value="score_desc">điểm cao → thấp</option>
+      <option value="name">tên file</option><option value="minside">vật nhỏ trước</option></select>
+    <span id="gCount" class="muted"></span>
+    <span class="grow"></span>
+    <span class="muted small">Phím: ←→ chọn ảnh · 1 good · 2 bad · 0 bỏ · Enter mở label</span>
+  </div>
+  <div id="gBanner"></div>
+  <div id="grid"></div>
+</section>
+
+<!-- ============ EDITOR ============ -->
+<section id="v-editor" class="view">
+  <div class="toolbar">
+    <button id="ePrev" title="A">◀</button><span id="eFile" class="mono"></span><button id="eNext" title="D">▶</button>
+    <span class="sep"></span>
+    <span class="seg" id="eModes">
+      <button data-mode="select" title="V">Chọn/sửa (V)</button>
+      <button data-mode="quad" title="F">4 điểm (F)</button>
+      <button data-mode="tri" title="R">3 điểm (R)</button>
+    </span>
+    <label class="small"><input type="checkbox" id="eRect" checked> ép chữ nhật (4 điểm)</label>
+    <span class="sep"></span>
+    Class <select id="eClass"></select>
+    <span class="sep"></span>
+    Lớp ảnh <select id="eLayer"></select>
+    <label class="small"><input type="checkbox" id="eShow" checked> hiện nhãn (H)</label>
+    <span class="grow"></span>
+    <span class="seg" id="eRate"><button data-r="good">good</button><button data-r="bad">bad</button></span>
+    <button id="eSave" class="primary">Lưu (Ctrl+S)</button>
+  </div>
+  <div class="editor">
+    <div class="canvaswrap" id="cwrap">
+      <canvas id="cv"></canvas>
+      <div id="eBanner"></div>
+      <div id="status" class="mono small"></div>
+    </div>
+    <aside class="side">
+      <div class="tabs" id="sTabs">
+        <button data-tab="labels">Nhãn</button><button data-tab="inspect">Kiểm tra cạnh</button>
+        <button data-tab="pixel">Pixel</button><button data-tab="auto">Auto-label</button><button data-tab="classes">Class</button>
+      </div>
+      <div class="tab" id="t-labels"></div>
+      <div class="tab" id="t-inspect"><p class="muted">Chọn 1 nhãn để xem.</p></div>
+      <div class="tab" id="t-pixel"><p class="muted">Rê chuột trên ảnh. Phím P: giữ/thả bảng.</p><div id="pxTables"></div></div>
+      <div class="tab" id="t-auto">
+        <div class="row">Model <select id="aModel" class="grow"></select><button id="aAdd" title="Thêm model">+ Thêm</button><button id="aDel" title="Xoá model khỏi danh sách">Xoá</button></div>
+        <p id="aNote" class="muted small"></p>
+        <div class="row">Ngưỡng <input type="range" id="aConf" min="0.05" max="0.9" step="0.05" value="0.3"><span id="aConfV">0.30</span></div>
+        <div id="aClasses" class="chips"></div>
+        <div class="row"><button id="aRun" class="primary">Chạy ảnh này</button><button id="aBatch">Chạy mọi ảnh chưa có nhãn</button><button id="aUnload" title="Giải phóng VRAM">Unload</button></div>
+        <p class="muted small">Kết quả là ĐỀ XUẤT (nét đứt). Enter = nhận đề xuất đang chọn, Delete = bỏ. Tab "Nhãn" có nút nhận/bỏ tất cả.</p>
+        <div id="aMsg" class="small"></div>
+      </div>
+      <div class="tab" id="t-classes">
+        <p class="muted small">Class lưu ở <code>_checked/data.yaml</code>. Chỉ thêm / đổi tên (không xoá để không lệch id).
+          "Prompt" = từ khoá cho auto-label (SAM 3 / YOLOE / Grounding DINO), nhiều từ cách nhau dấu phẩy, nên viết
+          <b>tiếng Anh</b> (vd: <i>pistol, handgun</i>) vì các model này hiểu tiếng Anh tốt hơn hẳn; tên class hiển thị thì để tiếng Việt cũng được.
+          Để trống prompt thì auto-label dùng luôn tên class làm từ khoá.</p>
+        <div id="cList"></div>
+        <div class="row"><input id="cNew" placeholder="Tên class mới" class="grow"><button id="cAdd" class="primary">+ Thêm class</button></div>
+        <div class="row"><button id="cPreset">+ Gợi ý nhanh: Hat / Mask / Backpack / Gloves / Goggles</button></div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- modal thêm model -->
+<dialog id="dlgModel">
+  <h3>Thêm model auto-label</h3>
+  <div class="form">
+    <label>Tên hiển thị <input id="mName" placeholder="vd: Model súng của tôi v2"></label>
+    <label>Loại <select id="mType"></select></label>
+    <label>Weights <span class="row"><input id="mW" class="grow" placeholder="đường dẫn .pt  hoặc  repo HuggingFace (vd facebook/sam3)"><button id="mBrowse" type="button">Duyệt...</button></span></label>
+    <label id="mSamRow">SAM 2 weights <input id="mSam" value="sam2.1_b.pt"></label>
+    <p class="muted small">YOLO tự train: class của model được ghép với class trong data.yaml theo TÊN (hoặc prompt).</p>
+  </div>
+  <div class="row end"><button id="mCancel">Huỷ</button><button id="mOk" class="primary">Thêm</button></div>
+</dialog>
+
+<div id="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

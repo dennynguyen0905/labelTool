@@ -1,0 +1,21 @@
+[
+ {
+  "id": "yoloe26l",
+  "name": "YOLOE-26L-seg (nhanh)",
+  "type": "yoloe",
+  "weights": "yoloe-26l-seg.pt"
+ },
+ {
+  "id": "sam3",
+  "name": "SAM 3 (chính xác nhất, cần quyền HF)",
+  "type": "sam3",
+  "weights": "facebook/sam3"
+ },
+ {
+  "id": "gdino_sam2",
+  "name": "Grounding DINO base + SAM 2.1-B",
+  "type": "gdino_sam2",
+  "weights": "IDEA-Research/grounding-dino-base",
+  "sam": "sam2.1_b.pt"
+ }
+]

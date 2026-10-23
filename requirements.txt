@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+numpy
+opencv-python
+pyyaml
+pillow
+ultralytics
+transformers
+
+# torch: cài bản có CUDA theo GPU máy bạn, ví dụ (CUDA 12.1):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+# không có GPU thì bỏ dòng trên, "pip install torch" bản CPU cũng chạy được (chậm hơn nhiều khi auto-label)
+torch
