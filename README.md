@@ -58,6 +58,11 @@ Model trong `models.json` (nút "+ Thêm" trong tab Auto-label). Weights tải 1
 |---|---|
 | `yoloe` | YOLOE-26L-seg, nhanh, theo text prompt |
 | `sam3` | SAM 3 (facebook/sam3, cần quyền HF), text → mask → OBB, chính xác nhất |
+
+> Riêng model `sam3`: repo HuggingFace bị giới hạn quyền (gated). Mỗi người cần tự vào
+> https://huggingface.co/facebook/sam3 bấm xin quyền, rồi chạy `pip install huggingface_hub[cli]` +
+> `hf auth login` (dán token HF của chính mình) 1 lần trên máy trước khi chạy model này lần đầu.
+> Các model khác (YOLOE, Grounding DINO, SAM 2) tự tải, không cần đăng nhập gì.
 | `gdino_sam2` | Grounding DINO base → box → SAM 2.1 → mask → OBB |
 | `yolo` | `.pt` tự train (detect / obb / seg), class ghép theo tên với data.yaml |
 
